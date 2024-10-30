@@ -299,11 +299,20 @@ def _CvxpyLayerFn(
             # extract solutions and append along batch dimension
             sol = [[] for _ in range(len(variables))]
             for i in range(ctx.batch_size):
+                if xs[i] is None:
+                    for j, v in enumerate(variables):
+                        # FIXME forward returns zeros when error
+                        sol[j].append(torch.zeros(1, 150))
+                    print('Failed')
+                    continue
+                    
                 sltn_dict = compiler.split_solution(
                     xs[i], active_vars=var_dict)
+                    
                 for j, v in enumerate(variables):
                     sol[j].append(to_torch(
                         sltn_dict[v.id], ctx.dtype, ctx.device).unsqueeze(0))
+                    # print('Just appended', j, sol[j][-1].shape)
             sol = [torch.cat(s, 0) for s in sol]
 
             if not ctx.batch:
@@ -337,6 +346,8 @@ def _CvxpyLayerFn(
                 dss.append(np.zeros(ctx.shapes[i][0]))
 
             dAs, dbs, dcs = ctx.DT_batch(dxs, dys, dss)
+            # print('Passing shapes into call:', dxs.shape, dys.shape, dss.shape)
+            # print('Getting shapes out of call:', len(dAs), dAs[0].shape, len(dbs), dbs[0].shape, len(dcs), dcs[0].shape)
 
             # differentiate from cone problem data to cvxpy parameters
             start = time.time()
